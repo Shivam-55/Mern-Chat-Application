@@ -1,7 +1,6 @@
-import { useContext, useEffect, useState} from "react";
+import { useContext, useEffect, useState,useRef} from "react";
 import Avatar from "./Avatar";
 import Logo from "./Logo";
-// import uniqBy from "lodash" ;
 import uniqBy from 'lodash/uniqBy';
 import { UserContext } from "./UserContext";
 
@@ -12,6 +11,7 @@ export default function Chat(){
     const [newMessageText,setNewMessageText] = useState(null);
     const [messages,setMessages] = useState([]);
     const {username,id} = useContext(UserContext);
+    const divUnderMessages = useRef();
     useEffect(()=>{
         const ws = new WebSocket('ws://localhost:8800');
         setWs(ws);
@@ -49,7 +49,14 @@ export default function Chat(){
             text: newMessageText,
         }));
         setNewMessageText('');
-        setMessages(prev=>([...prev,{text: newMessageText,isOur:true}]));
+        setMessages(prev=>([...prev,{
+            text: newMessageText,
+            sender: id,
+            recipient: selectedUserId,
+            id: Date.now(),
+        }]));
+        const div = divUnderMessages.current ;
+        div.scrollIntoView({behaviour:'smooth',block:'end'});
     }
 
     const onlinePeopleExcluOurUser = {...onlinePeople};
@@ -79,10 +86,16 @@ export default function Chat(){
                         </div>
                     )}
                     {!!selectedUserId && (
-                        <div>
-                            {messagesWithOutDupes.map(message=>(
-                                <div>{message.text}</div>
-                            ))}
+                        <div className="relative h-full">
+                            <div className="overflow-y-scroll absolute top-0 left-0 right-0 bottom-2">
+                                {messagesWithOutDupes.map(message=>(
+                                    <div className={(message.sender===id ? 'text-right' : 'text-left')}>
+                                        <div className={"text-left inline-block p-2 my-0.5 rounded-md text-sm " +(message.sender=== id ? 'bg-blue-500 text-white':'bg-white text-gray-500')}>{message.text}
+                                    </div>
+                                </div>
+                                ))}
+                                <div ref={divUnderMessages}></div>
+                            </div>
                         </div>
                     )}
                 </div>
