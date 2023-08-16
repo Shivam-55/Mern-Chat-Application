@@ -4,14 +4,16 @@ import Logo from "./Logo";
 import uniqBy from 'lodash/uniqBy';
 import { UserContext } from "./UserContext";
 import axios from "axios";
+import Contact from "./Contact";
 
 export default function Chat(){
     const [ws,setWs] = useState(null);
     const [onlinePeople,setOnlinePeople] = useState({});
+    const [offlinePeople,setOfflinePeople] = useState({});
     const [selectedUserId,setSelectedUserId] = useState(null);
     const [newMessageText,setNewMessageText] = useState('');
     const [messages,setMessages] = useState([]);
-    const {username,id} = useContext(UserContext);
+    const {username,id,setId,setUsername} = useContext(UserContext);
     const divUnderMessages = useRef();
     useEffect(()=>{
         connectToWs();
@@ -63,6 +65,14 @@ export default function Chat(){
         }]));
     }
 
+    function logout() {
+        axios.post('/logout').then(() => {
+          setWs(null);
+          setId(null);
+          setUsername(null);
+        });
+    }
+
     useEffect(()=>{
         const div = divUnderMessages.current ;
         if(div){
@@ -72,10 +82,14 @@ export default function Chat(){
 
     useEffect(() => {
         axios.get('/people').then(res=>{
-            const offlinePeople = res.data
+            const offlinePeopleArr = res.data
             .filter(p => p._id !== id)
             .filter(p => !Object.keys(onlinePeople).includes(p._id));
-            console.log(offlinePeople);
+            const offlinePeople = {} ;
+            offlinePeopleArr.forEach(p => {
+                offlinePeople[p._id] = p;
+            });
+            setOfflinePeople(offlinePeople);
         });
     }, [onlinePeople]);
 
@@ -87,9 +101,9 @@ export default function Chat(){
         }
     },[selectedUserId]);
 
-    function selectContact(userId){
-        setSelectedUserId(userId);
-    }
+    // function selectContact(userId){
+    //     setSelectedUserId(userId);
+    // }
 
     const onlinePeopleExcluOurUser = {...onlinePeople};
     delete onlinePeopleExcluOurUser[id] ;
@@ -97,19 +111,37 @@ export default function Chat(){
 
     return(
         <div className="flex h-screen">
-            <div className="bg-blue-100 w-1/3">
-                <Logo/>
-                {Object.keys(onlinePeopleExcluOurUser).map(userId=>(
-                    <div key={userId} onClick={()=>selectContact(userId)} className={"border-b border-gray-100  flex items-center gap-2 cursor-pointer "+(userId === selectedUserId ? 'bg-blue-300':'')}>
-                        {userId === selectedUserId && (
-                            <div className="w-2 bg-blue-500 h-12"></div>
-                        )}
-                        <div className="flex gap-2 py-2 pl-4 items-center">
-                            <Avatar online={true} username={onlinePeople[userId]} userId={userId}/>
-                            <span className="text-gray-800">{onlinePeople[userId]}</span>
-                        </div>
-                    </div>
-                ))}
+            <div className="bg-blue-100 w-1/3 flex flex-col">
+                <div className="flex-grow">
+                    <Logo/>
+                    {Object.keys(onlinePeopleExcluOurUser).map(userId=>(
+                        <Contact 
+                            key={userId}
+                            id={userId} 
+                            online={true}
+                            username={onlinePeopleExcluOurUser[userId]}
+                            onClick={()=>setSelectedUserId(userId)} 
+                            selected={userId === selectedUserId} />
+                    ))}
+                    {Object.keys(offlinePeople).map(userId=>(
+                        <Contact 
+                            key={userId}
+                            id={userId} 
+                            online={false}
+                            username={offlinePeople[userId].username}
+                            onClick={()=>setSelectedUserId(userId)} 
+                            selected={userId === selectedUserId}/>
+                    ))}
+                </div>
+                <div className="p-2 text-center flex items-center justify-center">
+                    <span className="mr-2 text-sm text-gray-800 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                            <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
+                        </svg>
+                        {username}
+                    </span>
+                    <button onClick={logout} className="text-sm bg-blue-300 py-1 px-2 text-gray-900 border rounded-sm">logout</button>
+                </div>
             </div>
             <div className="flex flex-col bg-blue-300 w-2/3 p-2">
                 <div className="flex-grow">
