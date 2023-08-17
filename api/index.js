@@ -8,7 +8,7 @@ const bcrypt = require('bcryptjs');
 const User = require('./models/User');
 const Message = require('./models/Message');
 const ws = require('ws');
-// const fs = require('fs');
+const fs = require('fs');
 // mongoose.set('strictQuery',false);
 
 dotenv.config();
@@ -24,6 +24,7 @@ const jwtSecret = process.env.JWT_SECRET ;
 const bcryptsalt = bcrypt.genSaltSync(10);
 
 const app = express();
+app.use('/uploads',express.static(__dirname+'/uploads'));
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
@@ -169,19 +170,34 @@ wss.on('connection',(connection,req)=>{
 
     connection.on('message',async (message)=>{
         const messageData =   JSON.parse(message.toString());
-        const {recipient,text} = messageData;
-        if(recipient && text){
+        const {recipient,text,file} = messageData;
+        let filename = null;
+        if(file){
+            console.log('size', file.data.length);
+            const parts = file.name.split('.');
+            const ext = parts[parts.length - 1];
+            filename = Date.now() + '.'+ext;
+            const path = __dirname + '/uploads/' + filename;
+            const bufferData = new Buffer(file.data.split(',')[1], 'base64');
+            fs.writeFile(path, bufferData, () => {
+            console.log('file saved:'+path);
+            });
+        }
+        if(recipient && (text || file)){
             const messageDoc = await Message.create({
                 sender:connection.userId,
                 recipient,
                 text,
+                file: file ? filename : null,
             });
+            console.log('created message');
             [...wss.clients]
             .filter(c=>c.userId === recipient)
             .forEach(c=>c.send(JSON.stringify({
                 text,
                 sender:connection.userId,
                 recipient,
+                file: file ? filename : null,
                 _id:messageDoc._id
             })));
         }
